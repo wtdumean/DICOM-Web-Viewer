@@ -1,0 +1,2928 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1a212d">
+  <title>PACS DICOM Viewer - Просмотрщик медицинских снимков</title>
+  <style>
+    :root {
+      --bg-main: #0c1017;
+      --bg-panel: #151b23;
+      --bg-panel-hover: #212833;
+      --bg-toolbar: #1a212d;
+      --bg-active: #1f6feb;
+      --border-color: #30363d;
+      --border-focus: #58a6ff;
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --text-accent: #58a6ff;
+      --text-warn: #f0883e;
+      --text-success: #3fb950;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      height: 48px;
+      background: var(--bg-toolbar);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      gap: 6px;
+      flex-shrink: 0;
+      z-index: 20;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+
+    .logo-badge {
+      background: linear-gradient(135deg, #1f6feb, #238636);
+      color: #fff;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .study-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .study-badge strong {
+      color: var(--text-main);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    button.btn {
+      background: var(--bg-panel);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      min-height: 30px;
+    }
+
+    button.btn:active, button.btn:hover {
+      background: var(--bg-panel-hover);
+      border-color: var(--text-muted);
+    }
+
+    button.btn.active {
+      background: var(--bg-active);
+      border-color: var(--text-accent);
+      color: #fff;
+    }
+
+    button.btn-primary {
+      background: #238636;
+      border-color: #2ea043;
+      color: #fff;
+    }
+
+    button.btn-primary:active, button.btn-primary:hover {
+      background: #2ea043;
+    }
+
+    .app-body {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sidebar-left {
+      width: 220px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: transform 0.25s ease, width 0.2s ease;
+      z-index: 25;
+    }
+
+    .sidebar-left.collapsed {
+      width: 0;
+      overflow: hidden;
+      border-right: none;
+    }
+
+    .sidebar-header {
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0,0,0,0.2);
+    }
+
+    .sidebar-open-actions {
+      display: flex;
+      gap: 4px;
+      padding: 8px;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(0,0,0,0.15);
+    }
+
+    .sidebar-open-actions button.btn {
+      flex: 1;
+      font-size: 11px;
+      padding: 6px 4px;
+    }
+
+    .series-info-card {
+      padding: 8px 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(255,255,255,0.02);
+      line-height: 1.4;
+    }
+
+    .series-info-card b {
+      color: var(--text-main);
+    }
+
+    .thumbnail-list {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .thumb-item {
+      background: #000;
+      border: 2px solid var(--border-color);
+      border-radius: 6px;
+      padding: 4px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .thumb-item:hover, .thumb-item:active {
+      border-color: var(--text-muted);
+    }
+
+    .thumb-item.active {
+      border-color: var(--text-accent);
+      box-shadow: 0 0 10px rgba(88, 166, 255, 0.4);
+    }
+
+    .thumb-canvas {
+      width: 100%;
+      aspect-ratio: 1;
+      background: #000;
+      border-radius: 3px;
+      display: block;
+    }
+
+    .thumb-caption {
+      margin-top: 4px;
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      font-family: var(--font-mono);
+    }
+
+    .thumb-item.active .thumb-caption {
+      color: var(--text-accent);
+      font-weight: 600;
+    }
+
+    .viewport-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      background: var(--bg-toolbar);
+      border-bottom: 1px solid var(--border-color);
+      padding: 4px 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      flex-shrink: 0;
+      z-index: 15;
+    }
+
+    .toolbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: var(--bg-panel);
+      padding: 2px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      flex-shrink: 0;
+    }
+
+    .tool-group button.btn {
+      border: none;
+      background: transparent;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      min-height: 28px;
+    }
+
+    .tool-group button.btn.active {
+      background: var(--bg-active);
+      color: #fff;
+    }
+
+    .toolbar select {
+      background: var(--bg-panel);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      outline: none;
+      cursor: pointer;
+      min-height: 28px;
+      flex-shrink: 0;
+    }
+
+    .toolbar-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--border-color);
+      margin: 0 2px;
+      flex-shrink: 0;
+    }
+
+    .viewport-container {
+      flex: 1;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      touch-action: none;
+    }
+
+    .canvas-wrapper {
+      position: absolute;
+      transform-origin: center center;
+      will-change: transform;
+    }
+
+    canvas#dicomCanvas {
+      display: block;
+      background: #000;
+    }
+
+    canvas#overlayCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+
+    .empty-state {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #151b23 0%, #0c1017 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 12;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .empty-state.hidden {
+      display: none;
+    }
+
+    .empty-box {
+      max-width: 480px;
+      width: 100%;
+      background: var(--bg-panel);
+      border: 2px dashed var(--border-color);
+      border-radius: 12px;
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .empty-icon {
+      font-size: 56px;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .empty-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .empty-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .empty-actions {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .empty-actions button.btn {
+      flex: 1;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      min-height: 42px;
+    }
+
+    .empty-privacy-badge {
+      font-size: 11px;
+      color: var(--text-success);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+      font-family: var(--font-mono);
+    }
+
+    .hud {
+      position: absolute;
+      pointer-events: none;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.4;
+      color: #38bdf8;
+      text-shadow: 1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000;
+      z-index: 10;
+      padding: 8px;
+    }
+
+    .hud-tl { top: 0; left: 0; text-align: left; }
+    .hud-tr { top: 0; right: 0; text-align: right; }
+    .hud-bl { bottom: 0; left: 0; text-align: left; }}
+    .hud-br { bottom: 0; right: 0; text-align: right; }
+
+    .hud.hidden {
+      display: none;
+    }
+
+    .bottom-controls {
+      background: var(--bg-toolbar);
+      border-top: 1px solid var(--border-color);
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      z-index: 15;
+    }
+
+    .cine-btn-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .slider-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    input[type=range] {
+      flex: 1;
+      accent-color: var(--text-accent);
+      cursor: pointer;
+      height: 8px;
+      background: var(--bg-panel);
+      border-radius: 4px;
+    }
+
+    .slice-counter {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      min-width: 80px;
+      color: var(--text-main);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .status-bar {
+      height: 22px;
+      background: #080c12;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      z-index: 15;
+      flex-shrink: 0;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-item b {
+      color: var(--text-main);
+    }
+
+    .sidebar-right {
+      width: 280px;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: transform 0.25s ease, width 0.2s ease;
+      z-index: 25;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .sidebar-right.collapsed {
+      width: 0;
+      overflow: hidden;
+      border-left: none;
+    }
+
+    .panel-section {
+      padding: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .control-row label {
+      color: var(--text-muted);
+    }
+
+    .control-row input[type=number] {
+      width: 60px;
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .control-row input[type=range] {
+      flex: 1;
+      margin: 0 8px;
+    }
+
+    .measurements-list {
+      max-height: 160px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .measurement-item {
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .measurement-item button {
+      background: transparent;
+      border: none;
+      color: #f85149;
+      cursor: pointer;
+      padding: 2px 6px;
+      font-size: 14px;
+    }
+
+    .drawer-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 22;
+      display: none;
+      backdrop-filter: blur(2px);
+    }
+
+    .drawer-backdrop.active {
+      display: block;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 10px;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      width: 800px;
+      max-width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    }
+
+    .modal-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .modal-body {
+      padding: 12px 16px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+    }
+
+    .modal-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .tag-search-input {
+      width: 100%;
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .tags-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    .tags-table th, .tags-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border-color);
+      text-align: left;
+    }
+
+    .tags-table th {
+      background: var(--bg-toolbar);
+      color: var(--text-muted);
+      position: sticky;
+      top: 0;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 8px;
+      padding: 4px;
+    }
+
+    .gallery-card {
+      background: #000;
+      border: 2px solid var(--border-color);
+      border-radius: 6px;
+      padding: 4px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: all 0.15s;
+    }
+
+    .gallery-card:active {
+      border-color: var(--text-accent);
+      transform: scale(0.98);
+    }
+
+    .gallery-card.active {
+      border-color: var(--text-success);
+    }
+
+    .gallery-canvas {
+      width: 100%;
+      aspect-ratio: 1;
+      display: block;
+      background: #000;
+      border-radius: 3px;
+    }
+
+    .gallery-caption {
+      font-size: 10px;
+      margin-top: 4px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-panel);
+      border: 1px solid var(--text-accent);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+      font-size: 12px;
+      display: none;
+      z-index: 200;
+      white-space: nowrap;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translate(-50%, 10px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+
+    .dropzone-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(26, 31, 41, 0.9);
+      border: 3px dashed var(--text-accent);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+      color: var(--text-main);
+      font-size: 18px;
+      font-weight: 600;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .dropzone-overlay.dragover {
+      display: flex;
+    }
+
+    @media (max-width: 768px) {
+      header {
+        padding: 0 6px;
+        height: 44px;
+      }
+
+      .study-badge {
+        display: none;
+      }
+
+      .sidebar-left {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 260px;
+        transform: translateX(-100%);
+        box-shadow: 4px 0 20px rgba(0,0,0,0.7);
+      }
+
+      .sidebar-left.open {
+        transform: translateX(0);
+        width: 260px;
+      }
+
+      .sidebar-right {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: 280px;
+        transform: translateX(100%);
+        box-shadow: -4px 0 20px rgba(0,0,0,0.7);
+      }
+
+      .sidebar-right.open {
+        transform: translateX(0);
+        width: 280px;
+      }
+
+      .hud {
+        font-size: 9px;
+        padding: 6px;
+        line-height: 1.3;
+      }
+
+      .hud-tl { max-width: 55%; }
+      .hud-tr { max-width: 45%; }
+      .hud-bl { max-width: 55%; }
+      .hud-br { max-width: 45%; }
+
+      .status-bar {
+        display: none;
+      }
+
+      .bottom-controls {
+        padding: 6px 8px;
+        gap: 6px;
+      }
+
+      .cine-btn-group button.btn {
+        padding: 6px 8px;
+        font-size: 11px;
+      }
+
+      .slice-counter {
+        font-size: 11px;
+        min-width: 65px;
+      }
+
+      .gallery-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .empty-actions {
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .logo-container span:not(.logo-badge) {
+        display: none;
+      }
+
+      .gallery-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .toolbar {
+        padding: 4px;
+      }
+
+      .tool-group button.btn {
+        padding: 4px 6px;
+        font-size: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-container">
+      <button class="btn" id="btnMobileDrawerLeft" title="Список срезов и открытие">☰</button>
+      <span class="logo-badge">PACS</span>
+      <span>DICOM Просмотрщик</span>
+    </div>
+
+    <div class="study-badge" id="studyBadge">
+      <span>Пациент: <strong id="headerPatient">Нет данных</strong></span>
+      <span>•</span>
+      <span><strong id="headerStudy">Ожидание загрузки</strong></span>
+      <span>•</span>
+      <span>Срезов: <strong id="headerSlicesCount">0</strong></span>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-primary" id="btnHeaderOpenFile" title="Открыть DICOM файлы">📁 <span>Файлы</span></button>
+      <button class="btn" id="btnHeaderOpenFolder" title="Открыть папку со снимками">📂 <span>Папка</span></button>
+      <button class="btn" id="btnGallery" title="Галерея срезов">🖼</button>
+      <button class="btn" id="btnMetadata" title="DICOM Теги">🏷</button>
+      <button class="btn" id="btnExport" title="Сохранить снимок">📸</button>
+      <button class="btn" id="btnHelp" title="Справка">❓</button>
+      <button class="btn" id="btnFullscreen" title="Полный экран">⛶</button>
+      <button class="btn" id="btnMobileDrawerRight" title="Параметры">⚙</button>
+    </div>
+  </header>
+
+  <input type="file" id="fileInput" multiple accept=".dcm,image/dicom,application/dicom,*/*" style="display:none">
+  <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none">
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+
+  <div class="app-body">
+
+    <aside class="sidebar-left" id="sidebarLeft">
+      <div class="sidebar-header">
+        <span>СЕРИЯ СРЕЗОВ</span>
+        <button class="btn" id="btnCloseLeftDrawer" style="padding: 2px 6px; font-size: 12px;">✕</button>
+      </div>
+
+      <div class="sidebar-open-actions">
+        <button class="btn btn-primary" id="btnSidebarOpenFile">📁 Файлы</button>
+        <button class="btn" id="btnSidebarOpenFolder">📂 Папка</button>
+      </div>
+
+      <div class="series-info-card" id="seriesCard">
+        <div><b>Томограф:</b> <span id="sideScanner">-</span></div>
+        <div><b>Серия:</b> <span id="sideSeries">-</span></div>
+        <div><b>Параметры:</b> <span id="sideParams">-</span></div>
+        <div><b>Матрица:</b> <span id="sideMatrix">-</span></div>
+      </div>
+
+      <div class="thumbnail-list" id="thumbnailList">
+        <div style="color:var(--text-muted); font-size:11px; text-align:center; padding:20px 10px; line-height:1.5;">
+          Снимки не загружены.<br>Нажмите «📁 Файлы» или «📂 Папка».
+        </div>
+      </div>
+    </aside>
+
+    <main class="viewport-area">
+      <div class="toolbar">
+        <div class="tool-group">
+          <button class="btn active" id="toolWL" title="Окно/Уровень">🎚 W/L</button>
+          <button class="btn" id="toolPan" title="Панорама">✋ Сдвиг</button>
+          <button class="btn" id="toolZoom" title="Зум">🔍 Зум</button>
+          <button class="btn" id="toolRuler" title="Линейка">📏 Линейка</button>
+          <button class="btn" id="toolAngle" title="Угол">📐 Угол</button>
+          <button class="btn" id="toolROI" title="ROI">⭕ ROI</button>
+          <button class="btn" id="toolProbe" title="Зонд">🎯 Зонд</button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <select id="wlPresetSelect" title="Пресеты контрастности">
+          <option value="default">Пресет: Default</option>
+          <option value="soft_tissue">Мягкие ткани</option>
+          <option value="bone">Кости</option>
+          <option value="tendon">Связки / Сухожилия</option>
+          <option value="edema">Отек (STIR)</option>
+          <option value="auto">Авто W/L</option>
+          <option value="full">Полный диапазон</option>
+        </select>
+
+        <div class="toolbar-divider"></div>
+
+        <button class="btn" id="btnInvert" title="Инверсия">🌓</button>
+        <button class="btn" id="btnRotateCW" title="Поворот 90°">🔄</button>
+        <button class="btn" id="btnFlipH" title="Отразить гор.">⇄</button>
+        <button class="btn" id="btnResetView" title="Сброс вида">⟲</button>
+        <button class="btn" id="btnToggleHUD" title="HUD инфо">👁</button>
+
+        <div class="toolbar-divider"></div>
+
+        <button class="btn" id="btnToolbarOpenFile" title="Открыть файлы">📁 Файлы</button>
+        <button class="btn" id="btnToolbarOpenFolder" title="Открыть папку">📂 Папка</button>
+      </div>
+
+      <div class="viewport-container" id="viewportContainer">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-box">
+            <div class="empty-icon">🏥</div>
+            <div class="empty-title">Загрузите DICOM снимки</div>
+            <div class="empty-desc">
+              Перетащите файлы <b>.dcm</b> или папку с исследованием МРТ / КТ прямо сюда или выберите на диске:
+            </div>
+            <div class="empty-actions">
+              <button class="btn btn-primary" id="btnEmptyOpenFile">📁 Выбрать файлы</button>
+              <button class="btn" id="btnEmptyOpenFolder">📂 Выбрать папку</button>
+            </div>
+            <div class="empty-privacy-badge">
+              🔒 100% локально — файлы не отправляются на сервер
+            </div>
+          </div>
+        </div>
+
+        <div class="canvas-wrapper" id="canvasWrapper">
+          <canvas id="dicomCanvas" width="512" height="512"></canvas>
+          <canvas id="overlayCanvas" width="512" height="512"></canvas>
+        </div>
+
+        <div class="hud hud-tl" id="hudTL">
+          <div id="hudPatientName">-</div>
+          <div id="hudPatientMeta">-</div>
+          <div id="hudBodyPart">-</div>
+        </div>
+
+        <div class="hud hud-tr" id="hudTR">
+          <div id="hudStudyDate">-</div>
+          <div id="hudScanner">-</div>
+          <div id="hudSequence">-</div>
+        </div>
+
+        <div class="hud hud-bl" id="hudBL">
+          <div id="hudSliceNum">Срез: 0 / 0</div>
+          <div id="hudSliceLoc">Позиция: -</div>
+          <div id="hudZoom">Зум: 100%</div>
+        </div>
+
+        <div class="hud hud-br" id="hudBR">
+          <div id="hudWL">W: -  L: -</div>
+          <div id="hudMatrix">-</div>
+          <div id="hudFOV">-</div>
+        </div>
+      </div>
+
+      <div class="bottom-controls">
+        <div class="cine-btn-group">
+          <button class="btn" id="btnPrevSlice" title="Предыдущий срез">◀</button>
+          <button class="btn btn-primary" id="btnPlayCine" title="Воспроизведение">▶</button>
+          <button class="btn" id="btnNextSlice" title="Следующий срез">▶</button>
+        </div>
+
+        <div class="slider-container">
+          <input type="range" id="sliceSlider" min="0" max="0" value="0">
+          <div class="slice-counter" id="sliceCounterText">0 / 0</div>
+        </div>
+
+        <select id="fpsSelect" style="background:var(--bg-panel); color:var(--text-main); border:1px solid var(--border-color); padding:3px 4px; border-radius:4px; font-size:11px;">
+          <option value="5">5 к/с</option>
+          <option value="10" selected>10 к/с</option>
+          <option value="15">15 к/с</option>
+          <option value="20">20 к/с</option>
+        </select>
+      </div>
+
+      <div class="status-bar">
+        <div class="status-item">
+          <span>Курсор: <b id="statCoords">X: - , Y: -</b></span>
+          <span>|</span>
+          <span>Сигнал: <b id="statSignal">- SI</b></span>
+          <span>|</span>
+          <span>Позиция: <b id="statMM">- × - мм</b></span>
+        </div>
+        <div class="status-item">
+          <span>Размер: <b id="statDim">-</b></span>
+        </div>
+      </div>
+    </main>
+
+    <aside class="sidebar-right" id="sidebarRight">
+      <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>ПАРАМЕТРЫ И ИЗМЕРЕНИЯ</span>
+        <button class="btn" id="btnCloseRightDrawer" style="padding: 2px 6px; font-size: 12px;">✕</button>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">
+          <span>Яркость и Контраст (W/L)</span>
+          <button class="btn" id="btnAutoContrast" style="padding:2px 6px; font-size:10px;">Авто</button>
+        </div>
+
+        <div class="control-row">
+          <label>Ширина (WW):</label>
+          <input type="range" id="wwSlider" min="1" max="2500" value="657">
+          <input type="number" id="wwNum" value="657">
+        </div>
+
+        <div class="control-row">
+          <label>Уровень (WL):</label>
+          <input type="range" id="wlSlider" min="0" max="1500" value="274">
+          <input type="number" id="wlNum" value="274">
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Масштаб</div>
+        <div class="control-row">
+          <label>Зум:</label>
+          <input type="range" id="zoomSlider" min="20" max="500" value="100">
+          <input type="number" id="zoomNum" value="100">
+        </div>
+        <div style="display:flex; gap:6px; margin-top:8px;">
+          <button class="btn" id="btnFitScreen" style="flex:1;">По экрану</button>
+          <button class="btn" id="btnActualSize" style="flex:1;">1:1</button>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">
+          <span>Измерения на срезе</span>
+          <button class="btn" id="btnClearMeasurements" style="padding:2px 6px; font-size:10px; color:#f85149;">Очистить</button>
+        </div>
+        <div class="measurements-list" id="measurementsList">
+          <div style="color:var(--text-muted); font-size:11px; text-align:center; padding:10px;">
+            Нет измерений. Выберите линейку (L), угол (A) или ROI (O).
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Фильтры</div>
+        <div class="control-row">
+          <label>Сглаживание:</label>
+          <input type="checkbox" id="chkSmoothing" checked>
+        </div>
+        <div class="control-row">
+          <label>Цветовая схема:</label>
+          <select id="colorLutSelect" style="background:var(--bg-main); color:var(--text-main); border:1px solid var(--border-color); padding:2px 6px; border-radius:4px; font-size:11px;">
+            <option value="grayscale">Оттенки серого</option>
+            <option value="hot_iron">Hot Iron</option>
+            <option value="rainbow">Радуга</option>
+            <option value="pet">ПЭТ</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="panel-section" style="flex:1;">
+        <div class="panel-title">Параметры МРТ / КТ</div>
+        <div id="sideDetailsList" style="font-size:11px; color:var(--text-muted); line-height:1.6; font-family:var(--font-mono);">
+          <div>Томограф: <b id="mriModel">-</b></div>
+          <div>Магнитное поле: <b id="mriField">-</b></div>
+          <div>Последовательность: <b id="mriSeq">-</b></div>
+          <div>Ориентация: <b id="mriOrient">-</b></div>
+          <div>Толщина среза: <b id="mriThickness">-</b></div>
+          <div>TR / TE: <b id="mriTrTe">-</b></div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <div class="modal-overlay" id="tagsModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span>Метаданные и Теги DICOM</span>
+        <button class="btn" id="btnCloseTagsModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" class="tag-search-input" id="tagSearchInput" placeholder="Поиск тегов...">
+        <table class="tags-table">
+          <thead>
+            <tr>
+              <th style="width:90px;">Тег</th>
+              <th>Название</th>
+              <th style="width:40px;">VR</th>
+              <th>Значение</th>
+            </tr>
+          </thead>
+          <tbody id="tagsTableBody"></tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="btnCopyTags">Копировать</button>
+        <button class="btn btn-primary" id="btnCloseTagsModal2">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="galleryModal">
+    <div class="modal-box" style="width:1000px; max-width:95vw;">
+      <div class="modal-header">
+        <span>Галерея всех срезов</span>
+        <button class="btn" id="btnCloseGalleryModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="gallery-grid" id="galleryGrid"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnCloseGalleryModal2">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="helpModal">
+    <div class="modal-box" style="width:600px;">
+      <div class="modal-header">
+        <span>Управление и Сенсорные жесты</span>
+        <button class="btn" id="btnCloseHelpModal">✕</button>
+      </div>
+      <div class="modal-body" style="font-size:13px; line-height:1.7;">
+        <h4 style="color:var(--text-accent); margin-bottom:6px;">Сенсорное управление (Смартфон / Планшет):</h4>
+        <ul style="padding-left:20px; margin-bottom:14px;">
+          <li><b>Сведение/разведение 2 пальцев (Pinch)</b> — плавное масштабирование (Зум)</li>
+          <li><b>Перетаскивание 2 пальцами</b> — панорамирование снимка</li>
+          <li><b>Перетаскивание 1 пальцем</b> — активный инструмент (Контраст, Линейка, Сдвиг)</li>
+          <li><b>Одиночное касание</b> — скрыть / показать оверлей HUD</li>
+          <li><b>Двойное касание</b> — сброс масштаба к исходному</li>
+        </ul>
+
+        <h4 style="color:var(--text-accent); margin-bottom:6px;">Клавиатура и мышь (ПК):</h4>
+        <ul style="padding-left:20px; margin-bottom:14px;">
+          <li><b>Колесо мыши / Стрелки</b> — листание срезов</li>
+          <li><b>Правая кнопка мыши</b> — регулировка яркости и контраста (W/L)</li>
+          <li><b>Средняя кнопка мыши</b> — панорамирование</li>
+          <li><b>Пробел</b> — запуск / пауза Cine-анимации</li>
+          <li><b>W / P / Z / L / A / O / I / R / 0</b> — горячие клавиши инструментов</li>
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnCloseHelpModal2">Понятно</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="appToast">Уведомление</div>
+
+  <div class="dropzone-overlay" id="dropzoneOverlay">
+    <div style="font-size:48px;">📂</div>
+    <div>Перетащите DICOM файлы сюда</div>
+  </div>
+
+  <script>
+    const state = {
+      slices: [],
+      currentSliceIdx: 0,
+      activeTool: 'wl',
+      windowWidth: 657,
+      windowCenter: 274,
+      zoom: 1.0,
+      panX: 0,
+      panY: 0,
+      rotation: 0,
+      flipH: 1,
+      flipV: 1,
+      isInverted: false,
+      colorLut: 'grayscale',
+      smoothing: true,
+      hudVisible: true,
+      isPlayingCine: false,
+      cineFps: 10,
+      cineLoopMode: 'loop',
+      cineDirection: 1,
+      measurements: [],
+      tempMeasurement: null,
+      isDragging: false,
+      dragMode: null,
+      dragStartX: 0,
+      dragStartY: 0,
+      initialW: 0,
+      initialL: 0,
+      initialPanX: 0,
+      initialPanY: 0,
+      initialZoom: 1.0,
+      lutTable: new Uint8Array(65536),
+      colorTable: null,
+      touchState: {
+        mode: null,
+        initialDist: 0,
+        initialMidX: 0,
+        initialMidY: 0,
+        lastTap: 0
+      }
+    };
+
+    let cineTimer = null;
+
+    const dicomCanvas = document.getElementById('dicomCanvas');
+    const ctx = dicomCanvas.getContext('2d');
+    const overlayCanvas = document.getElementById('overlayCanvas');
+    const overlayCtx = overlayCanvas.getContext('2d');
+    const canvasWrapper = document.getElementById('canvasWrapper');
+    const viewportContainer = document.getElementById('viewportContainer');
+    const emptyState = document.getElementById('emptyState');
+
+    const sliceSlider = document.getElementById('sliceSlider');
+    const sliceCounterText = document.getElementById('sliceCounterText');
+    const btnPlayCine = document.getElementById('btnPlayCine');
+    const wwSlider = document.getElementById('wwSlider');
+    const wwNum = document.getElementById('wwNum');
+    const wlSlider = document.getElementById('wlSlider');
+    const wlNum = document.getElementById('wlNum');
+    const zoomSlider = document.getElementById('zoomSlider');
+    const zoomNum = document.getElementById('zoomNum');
+    const thumbnailList = document.getElementById('thumbnailList');
+
+    function initUI() {
+      if (!state.slices || state.slices.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      sliceSlider.min = 0;
+      sliceSlider.max = state.slices.length - 1;
+      sliceSlider.value = 0;
+      state.currentSliceIdx = 0;
+
+      const firstSlice = state.slices[0];
+      state.windowWidth = firstSlice.windowWidth || 657;
+      state.windowCenter = firstSlice.windowCenter || 274;
+
+      wwSlider.value = state.windowWidth;
+      wwNum.value = Math.round(state.windowWidth);
+      wlSlider.value = state.windowCenter;
+      wlNum.value = Math.round(state.windowCenter);
+
+      const patName = (firstSlice.patientName || 'Аноним').replace(/\^/g, ' ');
+      document.getElementById('headerPatient').textContent = patName;
+      document.getElementById('hudPatientName').textContent = patName;
+      document.getElementById('headerStudy').textContent = `${firstSlice.seriesDesc || 'Исследование'} (${firstSlice.bodyPart || 'DICOM'})`;
+      document.getElementById('headerSlicesCount').textContent = state.slices.length;
+
+      document.getElementById('sideScanner').textContent = `${firstSlice.manufacturer || ''} ${firstSlice.model || ''}`;
+      document.getElementById('sideSeries').textContent = firstSlice.seriesDesc || '-';
+      document.getElementById('sideParams').textContent = `TR: ${firstSlice.tr || '-'} ms | TE: ${firstSlice.te || '-'} ms`;
+      document.getElementById('sideMatrix').textContent = `${firstSlice.cols || 512}×${firstSlice.rows || 512} | ${firstSlice.sliceThickness || 3.0} мм`;
+
+      document.getElementById('mriModel').textContent = firstSlice.model || firstSlice.manufacturer || '-';
+      document.getElementById('mriField').textContent = firstSlice.magneticField ? `${firstSlice.magneticField} T` : '-';
+      document.getElementById('mriSeq').textContent = firstSlice.seriesDesc || '-';
+      document.getElementById('mriOrient').textContent = 'DICOM 2D';
+      document.getElementById('mriThickness').textContent = firstSlice.sliceThickness ? `${firstSlice.sliceThickness} мм` : '-';
+      document.getElementById('mriTrTe').textContent = `${firstSlice.tr || '-'} / ${firstSlice.te || '-'} мс`;
+
+      updateLUT();
+      rebuildThumbnails();
+      resetTransform();
+      updateView();
+    }
+
+    function updateLUT() {
+      const ww = Math.max(1, state.windowWidth);
+      const wc = state.windowCenter;
+      const low = wc - ww / 2;
+      const high = wc + ww / 2;
+      const scale = 255 / ww;
+      const inv = state.isInverted;
+
+      for (let v = 0; v < 65536; v++) {
+        let norm = 0;
+        if (v <= low) norm = 0;
+        else if (v >= high) norm = 255;
+        else norm = Math.round((v - low) * scale);
+
+        state.lutTable[v] = inv ? (255 - norm) : norm;
+      }
+
+      if (state.colorLut === 'hot_iron') {
+        state.colorTable = buildHotIronTable(state.lutTable);
+      } else if (state.colorLut === 'rainbow') {
+        state.colorTable = buildRainbowTable(state.lutTable);
+      } else if (state.colorLut === 'pet') {
+        state.colorTable = buildPetTable(state.lutTable);
+      } else {
+        state.colorTable = null;
+      }
+    }
+
+    function buildHotIronTable(lut) {
+      const table = new Uint32Array(65536);
+      for (let i = 0; i < 65536; i++) {
+        const g = lut[i];
+        let r = 0, gr = 0, b = 0;
+        if (g < 85) {
+          r = Math.round(g * 3);
+        } else if (g < 170) {
+          r = 255;
+          gr = Math.round((g - 85) * 3);
+        } else {
+          r = 255;
+          gr = 255;
+          b = Math.round((g - 170) * 3);
+        }
+        table[i] = (255 << 24) | (b << 16) | (gr << 8) | r;
+      }
+      return table;
+    }
+
+    function buildRainbowTable(lut) {
+      const table = new Uint32Array(65536);
+      for (let i = 0; i < 65536; i++) {
+        const g = lut[i];
+        const h = (1.0 - g / 255.0) * 240;
+        const rgb = hslToRgb(h / 360, 1.0, g > 5 ? 0.5 : 0);
+        table[i] = (255 << 24) | (rgb[2] << 16) | (rgb[1] << 8) | rgb[0];
+      }
+      return table;
+    }
+
+    function buildPetTable(lut) {
+      const table = new Uint32Array(65536);
+      for (let i = 0; i < 65536; i++) {
+        const g = lut[i];
+        let r = Math.min(255, g * 2);
+        let gr = Math.max(0, Math.min(255, (g - 64) * 2));
+        let b = Math.max(0, (g - 160) * 3);
+        table[i] = (255 << 24) | (b << 16) | (gr << 8) | r;
+      }
+      return table;
+    }
+
+    function hslToRgb(h, s, l) {
+      let r, g, b;
+      if (s === 0) {
+        r = g = b = l;
+      } else {
+        const hue2rgb = (p, q, t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+      }
+      return [Math.round(r * 255), Math.round(g * 255), Math.round(g * 255)];
+    }
+
+    function renderCurrentSlice() {
+      const slice = state.slices[state.currentSliceIdx];
+      if (!slice || !slice.pixels) return;
+
+      const cols = slice.cols || 512;
+      const rows = slice.rows || 512;
+
+      if (dicomCanvas.width !== cols || dicomCanvas.height !== rows) {
+        dicomCanvas.width = cols;
+        dicomCanvas.height = rows;
+        overlayCanvas.width = cols;
+        overlayCanvas.height = rows;
+      }
+
+      const imgData = ctx.createImageData(cols, rows);
+      const data32 = new Uint32Array(imgData.data.buffer);
+      const pixels = slice.pixels;
+      const lut = state.lutTable;
+      const colorTable = state.colorTable;
+
+      if (colorTable) {
+        for (let i = 0; i < pixels.length; i++) {
+          data32[i] = colorTable[pixels[i]];
+        }
+      } else {
+        for (let i = 0; i < pixels.length; i++) {
+          const g = lut[pixels[i]];
+          data32[i] = (255 << 24) | (g << 16) | (g << 8) | g;
+        }
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+
+      renderAnnotations();
+      updateHUD();
+      updateThumbnailsHighlight();
+    }
+
+    function renderAnnotations() {
+      overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+      const sliceIdx = state.currentSliceIdx;
+      const slice = state.slices[sliceIdx];
+      if (!slice) return;
+      const spacing = slice.pixelSpacing || [1.0, 1.0];
+
+      const items = state.measurements.filter(m => m.sliceIdx === sliceIdx);
+      for (const m of items) {
+        drawMeasurement(overlayCtx, m, spacing, false);
+      }
+
+      if (state.tempMeasurement && state.tempMeasurement.sliceIdx === sliceIdx) {
+        drawMeasurement(overlayCtx, state.tempMeasurement, spacing, true);
+      }
+    }
+
+    function drawMeasurement(c, m, spacing, isTemp) {
+      c.save();
+      c.lineWidth = 1.5;
+      c.strokeStyle = isTemp ? '#f1e05a' : '#58a6ff';
+      c.fillStyle = isTemp ? '#f1e05a' : '#58a6ff';
+      c.font = '12px ui-monospace, monospace';
+
+      if (m.type === 'ruler') {
+        const x1 = m.x1, y1 = m.y1, x2 = m.x2, y2 = m.y2;
+        c.beginPath();
+        c.moveTo(x1, y1);
+        c.lineTo(x2, y2);
+        c.stroke();
+
+        drawTick(c, x1, y1, x2, y2);
+        drawTick(c, x2, y2, x1, y1);
+
+        const dx = (x2 - x1) * spacing[1];
+        const dy = (y2 - y1) * spacing[0];
+        const distMM = Math.sqrt(dx*dx + dy*dy);
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+
+        const text = `${distMM.toFixed(1)} мм`;
+        drawLabel(c, midX + 8, midY - 8, text);
+      }
+      else if (m.type === 'angle') {
+        const p1 = m.p1, p2 = m.p2, p3 = m.p3 || m.tempP3;
+        if (p1 && p2) {
+          c.beginPath();
+          c.moveTo(p1.x, p1.y);
+          c.lineTo(p2.x, p2.y);
+          c.stroke();
+          c.arc(p2.x, p2.y, 3, 0, Math.PI*2);
+          c.fill();
+        }
+        if (p2 && p3) {
+          c.beginPath();
+          c.moveTo(p2.x, p2.y);
+          c.lineTo(p3.x, p3.y);
+          c.stroke();
+
+          const v1x = p1.x - p2.x, v1y = p1.y - p2.y;
+          const v2x = p3.x - p2.x, v2y = p3.y - p2.y;
+          const dot = v1x*v2x + v1y*v2y;
+          const mag1 = Math.sqrt(v1x*v1x + v1y*v1y);
+          const mag2 = Math.sqrt(v2x*v2x + v2y*v2y);
+          if (mag1 > 0 && mag2 > 0) {
+            const cosVal = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+            const angleDeg = Math.acos(cosVal) * 180 / Math.PI;
+            drawLabel(c, p2.x + 12, p2.y - 12, `${angleDeg.toFixed(1)}°`);
+          }
+        }
+      }
+      else if (m.type === 'roi') {
+        const x1 = Math.min(m.x1, m.x2);
+        const y1 = Math.min(m.y1, m.y2);
+        const w = Math.abs(m.x2 - m.x1);
+        const h = Math.abs(m.y2 - m.y1);
+
+        c.setLineDash([4, 4]);
+        c.fillStyle = 'rgba(88, 166, 255, 0.15)';
+        c.beginPath();
+        c.rect(x1, y1, w, h);
+        c.fill();
+        c.stroke();
+        c.setLineDash([]);
+
+        const slice = state.slices[m.sliceIdx];
+        if (slice && slice.pixels && w > 1 && h > 1) {
+          const stats = calculateRoiStats(slice.pixels, slice.cols, x1, y1, w, h, spacing);
+          const text1 = `Площадь: ${stats.areaMM2.toFixed(1)} мм²`;
+          const text2 = `Mean: ${stats.mean.toFixed(1)} ± ${stats.sd.toFixed(1)}`;
+          const text3 = `Min: ${stats.min} Max: ${stats.max}`;
+          drawMultiLabel(c, x1 + w + 6, y1 + 10, [text1, text2, text3]);
+        }
+      }
+
+      c.restore();
+    }
+
+    function calculateRoiStats(pixels, cols, rx, ry, rw, rh, spacing) {
+      const xStart = Math.floor(rx);
+      const yStart = Math.floor(ry);
+      const xEnd = Math.floor(rx + rw);
+      const yEnd = Math.floor(ry + rh);
+
+      let count = 0, sum = 0, min = 65535, max = 0;
+      const values = [];
+
+      for (let y = yStart; y <= yEnd; y++) {
+        for (let x = xStart; x <= xEnd; x++) {
+          if (x >= 0 && x < cols && y >= 0 && y < pixels.length / cols) {
+            const val = pixels[y * cols + x];
+            values.push(val);
+            sum += val;
+            if (val < min) min = val;
+            if (val > max) max = val;
+            count++;
+          }
+        }
+      }
+
+      const mean = count > 0 ? (sum / count) : 0;
+      let varianceSum = 0;
+      for (let i = 0; i < values.length; i++) {
+        const diff = values[i] - mean;
+        varianceSum += diff * diff;
+      }
+      const sd = count > 1 ? Math.sqrt(varianceSum / (count - 1)) : 0;
+      const areaMM2 = count * spacing[0] * spacing[1];
+
+      return { count, mean, sd, min, max, areaMM2 };
+    }
+
+    function drawTick(c, x, y, ox, oy) {
+      const dx = ox - x, dy = oy - y;
+      const len = Math.sqrt(dx*dx + dy*dy);
+      if (len === 0) return;
+      const nx = -dy / len * 5;
+      const ny = dx / len * 5;
+      c.beginPath();
+      c.moveTo(x + nx, y + ny);
+      c.lineTo(x - nx, y - ny);
+      c.stroke();
+    }
+
+    function drawLabel(c, x, y, text) {
+      c.save();
+      c.font = '11px ui-monospace, monospace';
+      const tw = c.measureText(text).width;
+      c.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      c.fillRect(x - 2, y - 12, tw + 6, 15);
+      c.fillStyle = '#58a6ff';
+      c.fillText(text, x + 1, y);
+      c.restore();
+    }
+
+    function drawMultiLabel(c, x, y, lines) {
+      c.save();
+      c.font = '10px ui-monospace, monospace';
+      let maxW = 0;
+      for (const line of lines) {
+        maxW = Math.max(maxW, c.measureText(line).width);
+      }
+      c.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      c.fillRect(x - 4, y - 10, maxW + 8, lines.length * 14 + 4);
+      c.fillStyle = '#38bdf8';
+      for (let i = 0; i < lines.length; i++) {
+        c.fillText(lines[i], x, y + i * 14);
+      }
+      c.restore();
+    }
+
+    function updateHUD() {
+      const slice = state.slices[state.currentSliceIdx];
+      if (!slice) return;
+
+      const sliceLocFormatted = Number(slice.sliceLocation || 0).toFixed(1);
+      document.getElementById('hudSliceNum').textContent = `Срез: ${state.currentSliceIdx + 1} / ${state.slices.length}`;
+      document.getElementById('hudSliceLoc').textContent = `Позиция: ${sliceLocFormatted} мм`;
+      document.getElementById('hudZoom').textContent = `Зум: ${Math.round(state.zoom * 100)}%`;
+      document.getElementById('hudWL').textContent = `W: ${Math.round(state.windowWidth)} L: ${Math.round(state.windowCenter)}`;
+      document.getElementById('hudMatrix').textContent = `${slice.cols || 512}×${slice.rows || 512}`;
+      document.getElementById('hudScanner').textContent = `${slice.manufacturer || ''} ${slice.model || ''}`;
+      document.getElementById('hudSequence').textContent = `${slice.seriesDesc || ''} (TR:${slice.tr||'-'} TE:${slice.te||'-'})`;
+      document.getElementById('hudStudyDate').textContent = slice.studyDate ? `${slice.studyDate} ${slice.studyTime||''}` : '';
+
+      sliceSlider.value = state.currentSliceIdx;
+      sliceCounterText.textContent = `${state.currentSliceIdx + 1} / ${state.slices.length}`;
+
+      updateTransformCSS();
+      rebuildMeasurementsList();
+    }
+
+    function updateTransformCSS() {
+      const smooth = state.smoothing ? 'auto' : 'pixelated';
+      dicomCanvas.style.imageRendering = smooth;
+
+      const transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom * state.flipH}, ${state.zoom * state.flipV}) rotate(${state.rotation}deg)`;
+      canvasWrapper.style.transform = transform;
+    }
+
+    function resetTransform() {
+      state.panX = 0;
+      state.panY = 0;
+      state.rotation = 0;
+      state.flipH = 1;
+      state.flipV = 1;
+
+      const containerRect = viewportContainer.getBoundingClientRect();
+      const w = containerRect.width || window.innerWidth;
+      const h = containerRect.height || (window.innerHeight - 100);
+      const cols = (state.slices[0] && state.slices[0].cols) || 512;
+      const rows = (state.slices[0] && state.slices[0].rows) || 512;
+      const fitZoom = Math.min((w - 20) / cols, (h - 20) / rows);
+      state.zoom = Math.max(0.1, fitZoom);
+
+      zoomSlider.value = Math.round(state.zoom * 100);
+      zoomNum.value = Math.round(state.zoom * 100);
+
+      updateTransformCSS();
+    }
+
+    function updateView() {
+      renderCurrentSlice();
+    }
+
+    function rebuildThumbnails() {
+      thumbnailList.innerHTML = '';
+      for (let i = 0; i < state.slices.length; i++) {
+        const s = state.slices[i];
+        const item = document.createElement('div');
+        item.className = `thumb-item ${i === state.currentSliceIdx ? 'active' : ''}`;
+        item.dataset.idx = i;
+
+        const cvs = document.createElement('canvas');
+        cvs.className = 'thumb-canvas';
+        cvs.width = 128;
+        cvs.height = 128;
+
+        renderThumbnailFast(cvs, s);
+
+        const caption = document.createElement('div');
+        caption.className = 'thumb-caption';
+        const locStr = Number(s.sliceLocation || 0).toFixed(1);
+        caption.innerHTML = `<span>#${i + 1}</span><span>${locStr} мм</span>`;
+
+        item.appendChild(cvs);
+        item.appendChild(caption);
+
+        item.addEventListener('click', () => {
+          state.currentSliceIdx = i;
+          closeDrawers();
+          updateView();
+        });
+
+        thumbnailList.appendChild(item);
+      }
+    }
+
+    function renderThumbnailFast(cvs, slice) {
+      const tctx = cvs.getContext('2d');
+      const tw = 128, th = 128;
+      const imgData = tctx.createImageData(tw, th);
+      const data32 = new Uint32Array(imgData.data.buffer);
+      const pixels = slice.pixels;
+      const lut = state.lutTable;
+      const cols = slice.cols || 512;
+      const rows = slice.rows || 512;
+      const stepX = cols / tw;
+      const stepY = rows / th;
+
+      for (let ty = 0; ty < th; ty++) {
+        const sy = Math.floor(ty * stepY);
+        const rowOffset = sy * cols;
+        const targetRowOffset = ty * tw;
+        for (let tx = 0; tx < tw; tx++) {
+          const sx = Math.floor(tx * stepX);
+          const val = pixels[rowOffset + sx];
+          const g = lut[val];
+          data32[targetRowOffset + tx] = (255 << 24) | (g << 16) | (g << 8) | g;
+        }
+      }
+      tctx.putImageData(imgData, 0, 0);
+    }
+
+    function updateThumbnailsHighlight() {
+      const items = thumbnailList.querySelectorAll('.thumb-item');
+      items.forEach((it, idx) => {
+        if (idx === state.currentSliceIdx) {
+          it.classList.add('active');
+          it.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          it.classList.remove('active');
+        }
+      });
+    }
+
+    function rebuildMeasurementsList() {
+      const listEl = document.getElementById('measurementsList');
+      const sliceIdx = state.currentSliceIdx;
+      const items = state.measurements.filter(m => m.sliceIdx === sliceIdx);
+
+      if (items.length === 0) {
+        listEl.innerHTML = '<div style="color:var(--text-muted); font-size:11px; text-align:center; padding:10px;">Нет измерений на этом срезе.</div>';
+        return;
+      }
+
+      listEl.innerHTML = '';
+      const slice = state.slices[sliceIdx];
+      const spacing = slice.pixelSpacing || [1.0, 1.0];
+
+      items.forEach((m, idx) => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'measurement-item';
+
+        let label = '';
+        if (m.type === 'ruler') {
+          const dx = (m.x2 - m.x1) * spacing[1];
+          const dy = (m.y2 - m.y1) * spacing[0];
+          const distMM = Math.sqrt(dx*dx + dy*dy);
+          label = `📏 Линейка: ${distMM.toFixed(1)} мм`;
+        } else if (m.type === 'angle') {
+          const v1x = m.p1.x - m.p2.x, v1y = m.p1.y - m.p2.y;
+          const v2x = m.p3.x - m.p2.x, v2y = m.p3.y - m.p2.y;
+          const dot = v1x*v2x + v1y*v2y;
+          const mag1 = Math.sqrt(v1x*v1x + v1y*v1y);
+          const mag2 = Math.sqrt(v2x*v2x + v2y*v2y);
+          const cosVal = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+          const angleDeg = Math.acos(cosVal) * 180 / Math.PI;
+          label = `📐 Угол: ${angleDeg.toFixed(1)}°`;
+        } else if (m.type === 'roi') {
+          const w = Math.abs(m.x2 - m.x1);
+          const h = Math.abs(m.y2 - m.y1);
+          const x1 = Math.min(m.x1, m.x2);
+          const y1 = Math.min(m.y1, m.y2);
+          const stats = calculateRoiStats(slice.pixels, slice.cols, x1, y1, w, h, spacing);
+          label = `⭕ ROI: ${stats.areaMM2.toFixed(0)} мм² (Mean: ${stats.mean.toFixed(0)})`;
+        }
+
+        itemEl.innerHTML = `<span>${label}</span><button data-id="${m.id}">✕</button>`;
+        itemEl.querySelector('button').addEventListener('click', () => {
+          state.measurements = state.measurements.filter(x => x.id !== m.id);
+          updateView();
+        });
+
+        listEl.appendChild(itemEl);
+      });
+    }
+
+    function getCanvasCoords(clientX, clientY) {
+      const rect = dicomCanvas.getBoundingClientRect();
+      const scaleX = dicomCanvas.width / rect.width;
+      const scaleY = dicomCanvas.height / rect.height;
+      const x = Math.floor((clientX - rect.left) * scaleX);
+      const y = Math.floor((clientY - rect.top) * scaleY);
+      return { x, y };
+    }
+
+    viewportContainer.addEventListener('touchstart', (e) => {
+      if (state.slices.length === 0) return;
+
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        state.isDragging = false;
+        state.touchState.mode = 'pinch';
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        state.touchState.initialDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        state.touchState.initialMidX = (t1.clientX + t2.clientX) / 2;
+        state.touchState.initialMidY = (t1.clientY + t2.clientY) / 2;
+        state.initialZoom = state.zoom;
+        state.initialPanX = state.panX;
+        state.initialPanY = state.panY;
+        return;
+      }
+
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        const now = Date.now();
+        if (now - state.touchState.lastTap < 300) {
+          resetTransform();
+          state.touchState.lastTap = 0;
+          return;
+        }
+        state.touchState.lastTap = now;
+
+        state.touchState.mode = 'single';
+        state.isDragging = true;
+        state.dragStartX = t.clientX;
+        state.dragStartY = t.clientY;
+        state.initialW = state.windowWidth;
+        state.initialL = state.windowCenter;
+        state.initialPanX = state.panX;
+        state.initialPanY = state.panY;
+        state.initialZoom = state.zoom;
+
+        const pt = getCanvasCoords(t.clientX, t.clientY);
+        if (state.activeTool === 'wl') {
+          state.dragMode = 'wl';
+        } else if (state.activeTool === 'pan') {
+          state.dragMode = 'pan';
+        } else if (state.activeTool === 'zoom') {
+          state.dragMode = 'zoom';
+        } else if (state.activeTool === 'ruler') {
+          state.dragMode = 'measure_ruler';
+          state.tempMeasurement = {
+            id: Date.now(),
+            type: 'ruler',
+            sliceIdx: state.currentSliceIdx,
+            x1: pt.x,
+            y1: pt.y,
+            x2: pt.x,
+            y2: pt.y
+          };
+        } else if (state.activeTool === 'roi') {
+          state.dragMode = 'measure_roi';
+          state.tempMeasurement = {
+            id: Date.now(),
+            type: 'roi',
+            sliceIdx: state.currentSliceIdx,
+            x1: pt.x,
+            y1: pt.y,
+            x2: pt.x,
+            y2: pt.y
+          };
+        } else if (state.activeTool === 'angle') {
+          if (!state.tempMeasurement) {
+            state.tempMeasurement = {
+              id: Date.now(),
+              type: 'angle',
+              sliceIdx: state.currentSliceIdx,
+              p1: pt,
+              p2: null,
+              p3: null
+            };
+          } else if (!state.tempMeasurement.p2) {
+            state.tempMeasurement.p2 = pt;
+          } else if (!state.tempMeasurement.p3) {
+            state.tempMeasurement.p3 = pt;
+            state.measurements.push({ ...state.tempMeasurement });
+            state.tempMeasurement = null;
+            renderAnnotations();
+            rebuildMeasurementsList();
+          }
+        }
+      }
+    }, { passive: false });
+
+    viewportContainer.addEventListener('touchmove', (e) => {
+      if (state.slices.length === 0) return;
+
+      if (e.touches.length === 2 && state.touchState.mode === 'pinch') {
+        e.preventDefault();
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const currentDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        const currentMidX = (t1.clientX + t2.clientX) / 2;
+        const currentMidY = (t1.clientY + t2.clientY) / 2;
+
+        if (state.touchState.initialDist > 0) {
+          const zoomRatio = currentDist / state.touchState.initialDist;
+          state.zoom = Math.max(0.1, Math.min(10.0, state.initialZoom * zoomRatio));
+          zoomSlider.value = Math.round(state.zoom * 100);
+          zoomNum.value = Math.round(state.zoom * 100);
+        }
+
+        state.panX = state.initialPanX + (currentMidX - state.touchState.initialMidX);
+        state.panY = state.initialPanY + (currentMidY - state.touchState.initialMidY);
+        updateTransformCSS();
+        return;
+      }
+
+      if (e.touches.length === 1 && state.isDragging) {
+        e.preventDefault();
+        const t = e.touches[0];
+        const dx = t.clientX - state.dragStartX;
+        const dy = t.clientY - state.dragStartY;
+        const pt = getCanvasCoords(t.clientX, t.clientY);
+
+        if (state.dragMode === 'wl') {
+          state.windowWidth = Math.max(1, state.initialW + dx * 2);
+          state.windowCenter = Math.max(-500, state.initialL - dy * 2);
+          wwSlider.value = state.windowWidth;
+          wwNum.value = Math.round(state.windowWidth);
+          wlSlider.value = state.windowCenter;
+          wlNum.value = Math.round(state.windowCenter);
+          updateLUT();
+          updateView();
+        } else if (state.dragMode === 'pan') {
+          state.panX = state.initialPanX + dx;
+          state.panY = state.initialPanY + dy;
+          updateTransformCSS();
+        } else if (state.dragMode === 'zoom') {
+          const factor = Math.exp(-dy * 0.005);
+          state.zoom = Math.max(0.1, Math.min(10.0, state.initialZoom * factor));
+          zoomSlider.value = Math.round(state.zoom * 100);
+          zoomNum.value = Math.round(state.zoom * 100);
+          updateTransformCSS();
+        } else if (state.dragMode === 'measure_ruler' || state.dragMode === 'measure_roi') {
+          if (state.tempMeasurement) {
+            state.tempMeasurement.x2 = pt.x;
+            state.tempMeasurement.y2 = pt.y;
+            renderAnnotations();
+          }
+        }
+      }
+    }, { passive: false });
+
+    viewportContainer.addEventListener('touchend', (e) => {
+      if (state.touchState.mode === 'pinch' && e.touches.length < 2) {
+        state.touchState.mode = null;
+      }
+      if (state.isDragging) {
+        if ((state.dragMode === 'measure_ruler' || state.dragMode === 'measure_roi') && state.tempMeasurement) {
+          state.measurements.push({ ...state.tempMeasurement });
+          state.tempMeasurement = null;
+          rebuildMeasurementsList();
+        }
+        state.isDragging = false;
+        state.dragMode = null;
+        renderAnnotations();
+      }
+    });
+
+    viewportContainer.addEventListener('mousedown', (e) => {
+      if (state.slices.length === 0) return;
+
+      if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+        state.isDragging = true;
+        state.dragMode = 'pan';
+        state.dragStartX = e.clientX;
+        state.dragStartY = e.clientY;
+        state.initialPanX = state.panX;
+        state.initialPanY = state.panY;
+        return;
+      }
+
+      if (e.button === 2) {
+        state.isDragging = true;
+        state.dragMode = 'wl';
+        state.dragStartX = e.clientX;
+        state.dragStartY = e.clientY;
+        state.initialW = state.windowWidth;
+        state.initialL = state.windowCenter;
+        return;
+      }
+
+      if (e.button === 0) {
+        const pt = getCanvasCoords(e.clientX, e.clientY);
+        state.dragStartX = e.clientX;
+        state.dragStartY = e.clientY;
+
+        if (state.activeTool === 'wl') {
+          state.isDragging = true;
+          state.dragMode = 'wl';
+          state.initialW = state.windowWidth;
+          state.initialL = state.windowCenter;
+        }
+        else if (state.activeTool === 'pan') {
+          state.isDragging = true;
+          state.dragMode = 'pan';
+          state.initialPanX = state.panX;
+          state.initialPanY = state.panY;
+        }
+        else if (state.activeTool === 'zoom') {
+          state.isDragging = true;
+          state.dragMode = 'zoom';
+          state.initialZoom = state.zoom;
+        }
+        else if (state.activeTool === 'ruler') {
+          state.isDragging = true;
+          state.dragMode = 'measure_ruler';
+          state.tempMeasurement = {
+            id: Date.now(),
+            type: 'ruler',
+            sliceIdx: state.currentSliceIdx,
+            x1: pt.x,
+            y1: pt.y,
+            x2: pt.x,
+            y2: pt.y
+          };
+        }
+        else if (state.activeTool === 'roi') {
+          state.isDragging = true;
+          state.dragMode = 'measure_roi';
+          state.tempMeasurement = {
+            id: Date.now(),
+            type: 'roi',
+            sliceIdx: state.currentSliceIdx,
+            x1: pt.x,
+            y1: pt.y,
+            x2: pt.x,
+            y2: pt.y
+          };
+        }
+        else if (state.activeTool === 'angle') {
+          if (!state.tempMeasurement) {
+            state.tempMeasurement = {
+              id: Date.now(),
+              type: 'angle',
+              sliceIdx: state.currentSliceIdx,
+              p1: pt,
+              p2: null,
+              p3: null
+            };
+          } else if (!state.tempMeasurement.p2) {
+            state.tempMeasurement.p2 = pt;
+          } else if (!state.tempMeasurement.p3) {
+            state.tempMeasurement.p3 = pt;
+            state.measurements.push({ ...state.tempMeasurement });
+            state.tempMeasurement = null;
+            renderAnnotations();
+            rebuildMeasurementsList();
+          }
+        }
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (state.slices.length === 0) return;
+
+      const pt = getCanvasCoords(e.clientX, e.clientY);
+      const slice = state.slices[state.currentSliceIdx];
+
+      if (slice && slice.pixels && pt.x >= 0 && pt.x < slice.cols && pt.y >= 0 && pt.y < slice.rows) {
+        const idx = pt.y * slice.cols + pt.x;
+        const val = slice.pixels[idx];
+        const spacing = slice.pixelSpacing || [1.0, 1.0];
+        const mmX = (pt.x * spacing[1]).toFixed(1);
+        const mmY = (pt.y * spacing[0]).toFixed(1);
+
+        document.getElementById('statCoords').textContent = `X: ${pt.x}, Y: ${pt.y}`;
+        document.getElementById('statSignal').textContent = `${val} SI`;
+        document.getElementById('statMM').textContent = `${mmX} × ${mmY} мм`;
+      }
+
+      if (state.activeTool === 'angle' && state.tempMeasurement) {
+        if (state.tempMeasurement.p1 && !state.tempMeasurement.p2) {
+          state.tempMeasurement.p2 = pt;
+        } else if (state.tempMeasurement.p2 && !state.tempMeasurement.p3) {
+          state.tempMeasurement.tempP3 = pt;
+        }
+        renderAnnotations();
+      }
+
+      if (!state.isDragging) return;
+
+      const dx = e.clientX - state.dragStartX;
+      const dy = e.clientY - state.dragStartY;
+
+      if (state.dragMode === 'wl') {
+        state.windowWidth = Math.max(1, state.initialW + dx * 2);
+        state.windowCenter = Math.max(-500, state.initialL - dy * 2);
+        wwSlider.value = state.windowWidth;
+        wwNum.value = Math.round(state.windowWidth);
+        wlSlider.value = state.windowCenter;
+        wlNum.value = Math.round(state.windowCenter);
+        updateLUT();
+        updateView();
+      }
+      else if (state.dragMode === 'pan') {
+        state.panX = state.initialPanX + dx;
+        state.panY = state.initialPanY + dy;
+        updateTransformCSS();
+      }
+      else if (state.dragMode === 'zoom') {
+        const factor = Math.exp(-dy * 0.005);
+        state.zoom = Math.max(0.1, Math.min(10.0, state.initialZoom * factor));
+        zoomSlider.value = Math.round(state.zoom * 100);
+        zoomNum.value = Math.round(state.zoom * 100);
+        updateTransformCSS();
+      }
+      else if (state.dragMode === 'measure_ruler' || state.dragMode === 'measure_roi') {
+        if (state.tempMeasurement) {
+          state.tempMeasurement.x2 = pt.x;
+          state.tempMeasurement.y2 = pt.y;
+          renderAnnotations();
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (state.isDragging) {
+        if ((state.dragMode === 'measure_ruler' || state.dragMode === 'measure_roi') && state.tempMeasurement) {
+          state.measurements.push({ ...state.tempMeasurement });
+          state.tempMeasurement = null;
+          rebuildMeasurementsList();
+        }
+        state.isDragging = false;
+        state.dragMode = null;
+        renderAnnotations();
+      }
+    });
+
+    viewportContainer.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    viewportContainer.addEventListener('wheel', (e) => {
+      if (state.slices.length === 0) return;
+      e.preventDefault();
+      if (e.ctrlKey) {
+        const zoomDelta = e.deltaY < 0 ? 1.1 : 0.9;
+        state.zoom = Math.max(0.1, Math.min(10.0, state.zoom * zoomDelta));
+        zoomSlider.value = Math.round(state.zoom * 100);
+        zoomNum.value = Math.round(state.zoom * 100);
+        updateTransformCSS();
+      } else {
+        if (e.deltaY > 0) nextSlice();
+        else prevSlice();
+      }
+    }, { passive: false });
+
+    function nextSlice() {
+      if (state.slices.length === 0) return;
+      if (state.currentSliceIdx < state.slices.length - 1) {
+        state.currentSliceIdx++;
+        updateView();
+      } else if (state.isPlayingCine) {
+        if (state.cineLoopMode === 'loop') {
+          state.currentSliceIdx = 0;
+          updateView();
+        } else {
+          state.cineDirection = -1;
+          state.currentSliceIdx = state.slices.length - 2;
+          updateView();
+        }
+      }
+    }
+
+    function prevSlice() {
+      if (state.slices.length === 0) return;
+      if (state.currentSliceIdx > 0) {
+        state.currentSliceIdx--;
+        updateView();
+      } else if (state.isPlayingCine) {
+        if (state.cineLoopMode === 'loop') {
+          state.currentSliceIdx = state.slices.length - 1;
+          updateView();
+        } else {
+          state.cineDirection = 1;
+          state.currentSliceIdx = 1;
+          updateView();
+        }
+      }
+    }
+
+    function toggleCine() {
+      if (state.slices.length === 0) return;
+      state.isPlayingCine = !state.isPlayingCine;
+      if (state.isPlayingCine) {
+        btnPlayCine.textContent = '⏸';
+        btnPlayCine.classList.remove('btn-primary');
+        btnPlayCine.style.background = '#d97706';
+        startCineTimer();
+      } else {
+        btnPlayCine.textContent = '▶';
+        btnPlayCine.classList.add('btn-primary');
+        btnPlayCine.style.background = '';
+        stopCineTimer();
+      }
+    }
+
+    function startCineTimer() {
+      stopCineTimer();
+      const interval = 1000 / state.cineFps;
+      cineTimer = setInterval(() => {
+        if (state.cineDirection === 1) {
+          nextSlice();
+        } else {
+          prevSlice();
+        }
+      }, interval);
+    }
+
+    function stopCineTimer() {
+      if (cineTimer) {
+        clearInterval(cineTimer);
+        cineTimer = null;
+      }
+    }
+
+    const toolButtons = {
+      wl: document.getElementById('toolWL'),
+      pan: document.getElementById('toolPan'),
+      zoom: document.getElementById('toolZoom'),
+      ruler: document.getElementById('toolRuler'),
+      angle: document.getElementById('toolAngle'),
+      roi: document.getElementById('toolROI'),
+      probe: document.getElementById('toolProbe')
+    };
+
+    function setActiveTool(tool) {
+      state.activeTool = tool;
+      state.tempMeasurement = null;
+      renderAnnotations();
+
+      for (const [k, btn] of Object.entries(toolButtons)) {
+        if (k === tool) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+
+      if (tool === 'pan') viewportContainer.style.cursor = 'grab';
+      else if (tool === 'zoom') viewportContainer.style.cursor = 'zoom-in';
+      else if (tool === 'ruler' || tool === 'angle' || tool === 'roi') viewportContainer.style.cursor = 'crosshair';
+      else viewportContainer.style.cursor = 'default';
+    }
+
+    for (const [tool, btn] of Object.entries(toolButtons)) {
+      btn.addEventListener('click', () => setActiveTool(tool));
+    }
+
+    const presets = {
+      default: { w: 657, l: 274 },
+      soft_tissue: { w: 400, l: 200 },
+      bone: { w: 1000, l: 350 },
+      tendon: { w: 550, l: 230 },
+      edema: { w: 750, l: 300 },
+      full: { w: 1200, l: 600 }
+    };
+
+    document.getElementById('wlPresetSelect').addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'auto') {
+        applyAutoContrast();
+      } else if (presets[val]) {
+        state.windowWidth = presets[val].w;
+        state.windowCenter = presets[val].l;
+        syncWLControls();
+      }
+    });
+
+    function applyAutoContrast() {
+      const slice = state.slices[state.currentSliceIdx];
+      if (!slice || !slice.pixels) return;
+      const min = slice.minVal || 0;
+      const max = slice.maxVal || 1000;
+      state.windowWidth = Math.max(10, max - min);
+      state.windowCenter = Math.round(min + state.windowWidth / 2);
+      syncWLControls();
+    }
+
+    function syncWLControls() {
+      wwSlider.value = state.windowWidth;
+      wwNum.value = Math.round(state.windowWidth);
+      wlSlider.value = state.windowCenter;
+      wlNum.value = Math.round(state.windowCenter);
+      updateLUT();
+      updateView();
+    }
+
+    wwSlider.addEventListener('input', (e) => {
+      state.windowWidth = parseFloat(e.target.value);
+      wwNum.value = Math.round(state.windowWidth);
+      updateLUT();
+      updateView();
+    });
+
+    wwNum.addEventListener('change', (e) => {
+      state.windowWidth = Math.max(1, parseFloat(e.target.value));
+      wwSlider.value = state.windowWidth;
+      updateLUT();
+      updateView();
+    });
+
+    wlSlider.addEventListener('input', (e) => {
+      state.windowCenter = parseFloat(e.target.value);
+      wlNum.value = Math.round(state.windowCenter);
+      updateLUT();
+      updateView();
+    });
+
+    wlNum.addEventListener('change', (e) => {
+      state.windowCenter = parseFloat(e.target.value);
+      wlSlider.value = state.windowCenter;
+      updateLUT();
+      updateView();
+    });
+
+    zoomSlider.addEventListener('input', (e) => {
+      state.zoom = parseFloat(e.target.value) / 100;
+      zoomNum.value = Math.round(state.zoom * 100);
+      updateTransformCSS();
+    });
+
+    zoomNum.addEventListener('change', (e) => {
+      state.zoom = Math.max(0.1, parseFloat(e.target.value) / 100);
+      zoomSlider.value = Math.round(state.zoom * 100);
+      updateTransformCSS();
+    });
+
+    sliceSlider.addEventListener('input', (e) => {
+      state.currentSliceIdx = parseInt(e.target.value);
+      updateView();
+    });
+
+    document.getElementById('fpsSelect').addEventListener('change', (e) => {
+      state.cineFps = parseInt(e.target.value);
+      if (state.isPlayingCine) startCineTimer();
+    });
+
+    document.getElementById('btnPrevSlice').addEventListener('click', prevSlice);
+    document.getElementById('btnNextSlice').addEventListener('click', nextSlice);
+    btnPlayCine.addEventListener('click', toggleCine);
+
+    document.getElementById('btnInvert').addEventListener('click', () => {
+      state.isInverted = !state.isInverted;
+      updateLUT();
+      updateView();
+    });
+
+    document.getElementById('btnRotateCW').addEventListener('click', () => {
+      state.rotation = (state.rotation + 90) % 360;
+      updateTransformCSS();
+    });
+
+    document.getElementById('btnFlipH').addEventListener('click', () => {
+      state.flipH *= -1;
+      updateTransformCSS();
+    });
+
+    document.getElementById('btnResetView').addEventListener('click', () => {
+      if (state.slices.length === 0) return;
+      const first = state.slices[0];
+      state.windowWidth = first.windowWidth || 657;
+      state.windowCenter = first.windowCenter || 274;
+      state.isInverted = false;
+      syncWLControls();
+      resetTransform();
+    });
+
+    document.getElementById('btnToggleHUD').addEventListener('click', () => {
+      state.hudVisible = !state.hudVisible;
+      document.querySelectorAll('.hud').forEach(el => {
+        el.classList.toggle('hidden', !state.hudVisible);
+      });
+    });
+
+    document.getElementById('btnAutoContrast').addEventListener('click', applyAutoContrast);
+    document.getElementById('btnFitScreen').addEventListener('click', resetTransform);
+    document.getElementById('btnActualSize').addEventListener('click', () => {
+      state.zoom = 1.0;
+      state.panX = 0;
+      state.panY = 0;
+      zoomSlider.value = 100;
+      zoomNum.value = 100;
+      updateTransformCSS();
+    });
+
+    document.getElementById('btnClearMeasurements').addEventListener('click', () => {
+      state.measurements = state.measurements.filter(m => m.sliceIdx !== state.currentSliceIdx);
+      updateView();
+    });
+
+    document.getElementById('chkSmoothing').addEventListener('change', (e) => {
+      state.smoothing = e.target.checked;
+      updateTransformCSS();
+    });
+
+    document.getElementById('colorLutSelect').addEventListener('change', (e) => {
+      state.colorLut = e.target.value;
+      updateLUT();
+      updateView();
+    });
+
+    const sidebarLeft = document.getElementById('sidebarLeft');
+    const sidebarRight = document.getElementById('sidebarRight');
+    const drawerBackdrop = document.getElementById('drawerBackdrop');
+
+    function openLeftDrawer() {
+      sidebarLeft.classList.add('open');
+      sidebarLeft.classList.remove('collapsed');
+      sidebarRight.classList.remove('open');
+      drawerBackdrop.classList.add('active');
+    }
+
+    function openRightDrawer() {
+      sidebarRight.classList.add('open');
+      sidebarRight.classList.remove('collapsed');
+      sidebarLeft.classList.remove('open');
+      drawerBackdrop.classList.add('active');
+    }
+
+    function closeDrawers() {
+      sidebarLeft.classList.remove('open');
+      sidebarRight.classList.remove('open');
+      drawerBackdrop.classList.remove('active');
+    }
+
+    document.getElementById('btnMobileDrawerLeft').addEventListener('click', openLeftDrawer);
+    document.getElementById('btnMobileDrawerRight').addEventListener('click', openRightDrawer);
+    document.getElementById('btnCloseLeftDrawer').addEventListener('click', closeDrawers);
+    document.getElementById('btnCloseRightDrawer').addEventListener('click', closeDrawers);
+    drawerBackdrop.addEventListener('click', closeDrawers);
+
+    document.getElementById('btnFullscreen').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (state.slices.length > 0) {
+        resetTransform();
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+      const key = e.key.toLowerCase();
+      if (key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        toggleCine();
+      } else if (key === 'arrowleft' || key === 'arrowup') {
+        e.preventDefault();
+        prevSlice();
+      } else if (key === 'arrowright' || key === 'arrowdown') {
+        e.preventDefault();
+        nextSlice();
+      } else if (key === 'home') {
+        e.preventDefault();
+        state.currentSliceIdx = 0;
+        updateView();
+      } else if (key === 'end') {
+        e.preventDefault();
+        state.currentSliceIdx = Math.max(0, state.slices.length - 1);
+        updateView();
+      } else if (key === 'w') {
+        setActiveTool('wl');
+      } else if (key === 'p') {
+        setActiveTool('pan');
+      } else if (key === 'z') {
+        setActiveTool('zoom');
+      } else if (key === 'l') {
+        setActiveTool('ruler');
+      } else if (key === 'a') {
+        setActiveTool('angle');
+      } else if (key === 'o') {
+        setActiveTool('roi');
+      } else if (key === 'i') {
+        state.isInverted = !state.isInverted;
+        updateLUT();
+        updateView();
+      } else if (key === 'r') {
+        state.rotation = (state.rotation + 90) % 360;
+        updateTransformCSS();
+      } else if (key === '0') {
+        document.getElementById('btnResetView').click();
+      } else if (key === 'h') {
+        document.getElementById('btnToggleHUD').click();
+      } else if (key === 'g') {
+        openGalleryModal();
+      } else if (key === 't') {
+        openTagsModal();
+      } else if (key === 's') {
+        exportImage();
+      } else if (key === '?' || key === '/') {
+        openHelpModal();
+      } else if (key === 'escape') {
+        closeAllModals();
+        closeDrawers();
+      }
+    });
+
+    const tagsModal = document.getElementById('tagsModal');
+    const galleryModal = document.getElementById('galleryModal');
+    const helpModal = document.getElementById('helpModal');
+
+    function closeAllModals() {
+      tagsModal.classList.remove('open');
+      galleryModal.classList.remove('open');
+      helpModal.classList.remove('open');
+    }
+
+    function openTagsModal() {
+      const slice = state.slices[state.currentSliceIdx];
+      if (!slice || !slice.tags) {
+        showToast("Загрузите DICOM файлы для просмотра тегов");
+        return;
+      }
+      populateTagsTable(slice.tags);
+      tagsModal.classList.add('open');
+    }
+
+    function populateTagsTable(tags, filter = '') {
+      const tbody = document.getElementById('tagsTableBody');
+      tbody.innerHTML = '';
+      const f = filter.toLowerCase();
+
+      for (const t of tags) {
+        if (f && !t.tag.toLowerCase().includes(f) && !t.name.toLowerCase().includes(f) && !String(t.val).toLowerCase().includes(f)) {
+          continue;
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><b>${t.tag}</b></td><td>${t.name}</td><td><span style="color:var(--text-muted);">${t.vr}</span></td><td>${t.val || ''}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    document.getElementById('tagSearchInput').addEventListener('input', (e) => {
+      const slice = state.slices[state.currentSliceIdx];
+      if (slice && slice.tags) {
+        populateTagsTable(slice.tags, e.target.value);
+      }
+    });
+
+    document.getElementById('btnMetadata').addEventListener('click', openTagsModal);
+    document.getElementById('btnCloseTagsModal').addEventListener('click', () => tagsModal.classList.remove('open'));
+    document.getElementById('btnCloseTagsModal2').addEventListener('click', () => tagsModal.classList.remove('open'));
+
+    document.getElementById('btnCopyTags').addEventListener('click', () => {
+      const slice = state.slices[state.currentSliceIdx];
+      if (!slice || !slice.tags) return;
+      let text = `DICOM Tags - Slice ${state.currentSliceIdx + 1}\n\n`;
+      for (const t of slice.tags) {
+        text += `${t.tag} [${t.vr}] ${t.name}: ${t.val}\n`;
+      }
+      navigator.clipboard.writeText(text).then(() => {
+        showToast("Теги скопированы");
+      });
+    });
+
+    function openGalleryModal() {
+      if (state.slices.length === 0) {
+        showToast("Загрузите снимки для просмотра галереи");
+        return;
+      }
+
+      const grid = document.getElementById('galleryGrid');
+      grid.innerHTML = '';
+
+      for (let i = 0; i < state.slices.length; i++) {
+        const s = state.slices[i];
+        const card = document.createElement('div');
+        card.className = `gallery-card ${i === state.currentSliceIdx ? 'active' : ''}`;
+
+        const cvs = document.createElement('canvas');
+        cvs.className = 'gallery-canvas';
+        cvs.width = 128;
+        cvs.height = 128;
+        renderThumbnailFast(cvs, s);
+
+        const cap = document.createElement('div');
+        cap.className = 'gallery-caption';
+        const locStr = Number(s.sliceLocation || 0).toFixed(1);
+        cap.textContent = `Срез ${i + 1} (${locStr} мм)`;
+
+        card.appendChild(cvs);
+        card.appendChild(cap);
+
+        card.addEventListener('click', () => {
+          state.currentSliceIdx = i;
+          galleryModal.classList.remove('open');
+          updateView();
+        });
+
+        grid.appendChild(card);
+      }
+
+      galleryModal.classList.add('open');
+    }
+
+    document.getElementById('btnGallery').addEventListener('click', openGalleryModal);
+    document.getElementById('btnCloseGalleryModal').addEventListener('click', () => galleryModal.classList.remove('open'));
+    document.getElementById('btnCloseGalleryModal2').addEventListener('click', () => galleryModal.classList.remove('open'));
+
+    function openHelpModal() {
+      helpModal.classList.add('open');
+    }
+
+    document.getElementById('btnHelp').addEventListener('click', openHelpModal);
+    document.getElementById('btnCloseHelpModal').addEventListener('click', () => helpModal.classList.remove('open'));
+    document.getElementById('btnCloseHelpModal2').addEventListener('click', () => helpModal.classList.remove('open'));
+
+    function exportImage() {
+      if (state.slices.length === 0) {
+        showToast("Нет загруженного снимка для экспорта");
+        return;
+      }
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = dicomCanvas.width;
+      exportCanvas.height = dicomCanvas.height;
+      const expCtx = exportCanvas.getContext('2d');
+
+      expCtx.drawImage(dicomCanvas, 0, 0);
+      expCtx.drawImage(overlayCanvas, 0, 0);
+
+      const link = document.createElement('a');
+      link.download = `DICOM_Slice_${state.currentSliceIdx + 1}.png`;
+      link.href = exportCanvas.toDataURL('image/png');
+      link.click();
+      showToast("Снимок сохранен");
+    }
+
+    document.getElementById('btnExport').addEventListener('click', exportImage);
+
+    function showToast(msg, duration = 2000) {
+      const toast = document.getElementById('appToast');
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, duration);
+    }
+
+    const fileInput = document.getElementById('fileInput');
+    const folderInput = document.getElementById('folderInput');
+
+    function triggerOpenFile() {
+      closeDrawers();
+      fileInput.click();
+    }
+
+    function triggerOpenFolder() {
+      closeDrawers();
+      folderInput.click();
+    }
+
+    document.getElementById('btnHeaderOpenFile').addEventListener('click', triggerOpenFile);
+    document.getElementById('btnHeaderOpenFolder').addEventListener('click', triggerOpenFolder);
+    document.getElementById('btnSidebarOpenFile').addEventListener('click', triggerOpenFile);
+    document.getElementById('btnSidebarOpenFolder').addEventListener('click', triggerOpenFolder);
+    document.getElementById('btnToolbarOpenFile').addEventListener('click', triggerOpenFile);
+    document.getElementById('btnToolbarOpenFolder').addEventListener('click', triggerOpenFolder);
+    document.getElementById('btnEmptyOpenFile').addEventListener('click', triggerOpenFile);
+    document.getElementById('btnEmptyOpenFolder').addEventListener('click', triggerOpenFolder);
+
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+    folderInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    const dropzoneOverlay = document.getElementById('dropzoneOverlay');
+    window.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzoneOverlay.classList.add('dragover');
+    });
+
+    window.addEventListener('dragleave', (e) => {
+      if (e.clientX <= 0 || e.clientY <= 0) {
+        dropzoneOverlay.classList.remove('dragover');
+      }
+    });
+
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzoneOverlay.classList.remove('dragover');
+      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files);
+      }
+    });
+
+    async function handleFiles(fileList) {
+      const files = Array.from(fileList);
+      if (files.length === 0) return;
+
+      showToast(`Обработка ${files.length} файлов...`);
+      const parsedSlices = [];
+
+      for (const file of files) {
+        try {
+          const buffer = await file.arrayBuffer();
+          const slice = parseDicomBuffer(buffer, file.name);
+          if (slice && slice.pixels) {
+            parsedSlices.push(slice);
+          }
+        } catch (err) {
+          console.warn("Could not parse file:", file.name, err);
+        }
+      }
+
+      if (parsedSlices.length === 0) {
+        showToast("Не удалось найти валидные DICOM файлы", 4000);
+        return;
+      }
+
+      parsedSlices.sort((a, b) => {
+        const instA = parseInt(a.instanceNumber || 0);
+        const instB = parseInt(b.instanceNumber || 0);
+        if (instA !== instB) return instA - instB;
+        return parseFloat(a.sliceLocation || 0) - parseFloat(b.sliceLocation || 0);
+      });
+
+      state.slices = parsedSlices;
+      state.measurements = [];
+      initUI();
+      showToast(`Загружено ${parsedSlices.length} срезов`, 3000);
+    }
+
+    function parseDicomBuffer(buffer, filename = '') {
+      const bytes = new Uint8Array(buffer);
+      const dataView = new DataView(buffer);
+
+      if (bytes.length < 132) return null;
+      const magic = String.fromCharCode(bytes[128], bytes[129], bytes[130], bytes[131]);
+      let offset = 132;
+      if (magic !== 'DICM') offset = 0;
+
+      const info = { filename, tags: [] };
+      let pixelOffset = -1;
+      let pixelLen = 0;
+
+      while (offset < bytes.length - 8) {
+        const group = dataView.getUint16(offset, true);
+        const elem = dataView.getUint16(offset + 2, true);
+        const tag = (group << 16) | elem;
+        const vr = String.fromCharCode(bytes[offset + 4], bytes[offset + 5]);
+
+        let length = 0;
+        let valOffset = 0;
+
+        if (['OB','OD','OF','OL','OW','SQ','UC','UR','UT','UN'].includes(vr)) {
+          length = dataView.getUint32(offset + 8, true);
+          valOffset = offset + 12;
+        } else if (vr.charCodeAt(0) >= 65 && vr.charCodeAt(0) <= 90 && vr.charCodeAt(1) >= 65 && vr.charCodeAt(1) <= 90) {
+          length = dataView.getUint16(offset + 6, true);
+          valOffset = offset + 8;
+        } else {
+          length = dataView.getUint32(offset + 4, true);
+          valOffset = offset + 8;
+        }
+
+        if (group === 0x7FE0 && elem === 0x0010) {
+          pixelOffset = valOffset;
+          pixelLen = length;
+          break;
+        }
+
+        let valStr = '';
+        try {
+          if (['US', 'UL', 'SS', 'SL'].includes(vr)) {
+            valStr = length === 2 ? dataView.getUint16(valOffset, true) : dataView.getUint32(valOffset, true);
+          } else {
+            const strBytes = bytes.subarray(valOffset, valOffset + Math.min(length, 64));
+            valStr = new TextDecoder('latin1').decode(strBytes).replace(/\0/g, '').trim();
+          }
+        } catch(e) {}
+
+        const tagHex = `(${group.toString(16).padStart(4, '0').toUpperCase()},${elem.toString(16).padStart(4, '0').toUpperCase()})`;
+        info.tags.push({ tag: tagHex, name: getTagName(group, elem), vr, len: length, val: String(valStr) });
+
+        if (group === 0x0028 && elem === 0x0010) info.rows = dataView.getUint16(valOffset, true);
+        else if (group === 0x0028 && elem === 0x0011) info.cols = dataView.getUint16(valOffset, true);
+        else if (group === 0x0028 && elem === 0x0100) info.bitsAllocated = dataView.getUint16(valOffset, true);
+        else if (group === 0x0028 && elem === 0x1050) info.windowCenter = parseFloat(valStr) || 274;
+        else if (group === 0x0028 && elem === 0x1051) info.windowWidth = parseFloat(valStr) || 657;
+        else if (group === 0x0020 && elem === 0x0013) info.instanceNumber = parseInt(valStr) || 1;
+        else if (group === 0x0020 && elem === 0x1041) info.sliceLocation = parseFloat(valStr) || 0;
+        else if (group === 0x0018 && elem === 0x0050) info.sliceThickness = parseFloat(valStr) || 3.0;
+        else if (group === 0x0010 && elem === 0x0010) info.patientName = valStr;
+        else if (group === 0x0008 && elem === 0x103E) info.seriesDesc = valStr;
+        else if (group === 0x0018 && elem === 0x0015) info.bodyPart = valStr;
+        else if (group === 0x0008 && elem === 0x0070) info.manufacturer = valStr;
+        else if (group === 0x0008 && elem === 0x1090) info.model = valStr;
+        else if (group === 0x0018 && elem === 0x0080) info.tr = valStr;
+        else if (group === 0x0018 && elem === 0x0081) info.te = valStr;
+        else if (group === 0x0018 && elem === 0x0087) info.magneticField = valStr;
+        else if (group === 0x0008 && elem === 0x0020) info.studyDate = valStr;
+        else if (group === 0x0008 && elem === 0x0030) info.studyTime = valStr;
+        else if (group === 0x0028 && elem === 0x0030) {
+          const parts = String(valStr).split('\\');
+          info.pixelSpacing = [parseFloat(parts[0]) || 1.0, parseFloat(parts[1]) || 1.0];
+        }
+
+        if (length === 0xFFFFFFFF || length < 0) break;
+        offset = valOffset + length;
+      }
+
+      if (pixelOffset === -1) return null;
+
+      const cols = info.cols || 512;
+      const rows = info.rows || 512;
+      const pixelCount = cols * rows;
+      const pixelArray = new Uint16Array(buffer, pixelOffset, pixelCount);
+
+      let minVal = 65535, maxVal = 0;
+      for (let i = 0; i < pixelArray.length; i++) {
+        const v = pixelArray[i];
+        if (v < minVal) minVal = v;
+        if (v > maxVal) maxVal = v;
+      }
+
+      return {
+        ...info,
+        cols,
+        rows,
+        pixels: pixelArray,
+        minVal,
+        maxVal,
+        pixelSpacing: info.pixelSpacing || [1.0, 1.0]
+      };
+    }
+
+    function getTagName(g, e) {
+      const dict = {
+        0x00100010: 'Пациент (PatientName)',
+        0x00100020: 'ID пациента (PatientID)',
+        0x00100030: 'Дата рождения (PatientBirthDate)',
+        0x00100040: 'Пол (PatientSex)',
+        0x00080020: 'Дата исследования (StudyDate)',
+        0x00080060: 'Модальность (Modality)',
+        0x00080070: 'Производитель (Manufacturer)',
+        0x00080080: 'Клиника (InstitutionName)',
+        0x0008103E: 'Серия (SeriesDescription)',
+        0x00081090: 'Модель томографа (ManufacturerModelName)',
+        0x00180015: 'Область (BodyPartExamined)',
+        0x00180050: 'Толщина среза (SliceThickness)',
+        0x00180080: 'TR (RepetitionTime)',
+        0x00180081: 'TE (EchoTime)',
+        0x00180087: 'Поле (MagneticFieldStrength)',
+        0x00181314: 'Угол (FlipAngle)',
+        0x00200013: 'Номер среза (InstanceNumber)',
+        0x00201041: 'Позиция среза (SliceLocation)',
+        0x00280010: 'Строки (Rows)',
+        0x00280011: 'Столбцы (Columns)',
+        0x00280030: 'Размер пикселя (PixelSpacing)',
+        0x00281050: 'Window Center (WL)',
+        0x00281051: 'Window Width (WW)'
+      };
+      const key = (g << 16) | e;
+      return dict[key] || 'Тег DICOM';
+    }
+
+    initUI();
+  </script>
+</body>
+</html>
