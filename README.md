@@ -8,6 +8,8 @@
 > **Автономный легковесный веб-просмотрщик медицинских DICOM-снимков (МРТ / КТ / Рентген) в одном HTML-файле.**
 > Работает без бэкенда, без установки Node.js/серверов и без внешних библиотек (Zero-dependency). Открывается двойным кликом в любом браузере на ПК, смартфонах и планшетах.
 
+[![🌐 Открыть веб-версию](https://img.shields.io/badge/🌐_Открыть_веб--версию-Live_Demo-0078D4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://wtdumean.github.io/DICOM-Web-Viewer/)
+
 ---
 
 ## 🌟 Ключевые возможности (Features)
