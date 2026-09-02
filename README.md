@@ -101,7 +101,7 @@ viewer.html
 └── 👆 Multi-touch & Mouse Event Controller (Pinch-to-zoom, Pan, Measurements)
 ```
 
-- **Zero Network Overhead**: Работает полностью локально по протоколу `file:///`, данные пациента не покидают ваше устройство.
+- **Zero Network Overhead**: Работает полностью локально по протоколу `file:///`, данные пациента не покидают устройство.
 - **Medical Compliance**: Соответствует стандарту DICOM PS 3.3 для отображения матриц 512×512 и параметров сканирования.
 
 ---
